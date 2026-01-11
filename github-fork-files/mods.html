@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mods</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+  :root{ --accent:#00e0c6; }
+  html,body{
+    height:100%;
+    margin:0;
+    color:var(--accent);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;
+    background:transparent;
+    overflow:auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #bg{ position:fixed; inset:0; z-index:0; pointer-events:none; }
+  .wrap{min-height:100vh;box-sizing:border-box;padding:18px;display:flex;flex-direction:column;gap:14px;align-items:center;position:relative;z-index:1;}
+  .header{width:100%;max-width:980px;display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:36px;position:relative;}
+  .title{font-size:40px;font-weight:900;color:var(--accent);text-align:center;letter-spacing:0.6px;}
+  .controls{width:100%;max-width:980px;display:flex;gap:10px;align-items:center;justify-content:center;padding-top:6px}
+  .search{width:100%;max-width:640px;height:46px;border-radius:12px;padding:10px 14px;border:1px solid rgba(255,255,255,0.04);
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.03));color:var(--accent);font-weight:700;font-size:16px;outline:none}
+  .search::placeholder{ color: rgba(223,246,239,0.48); }
+
+  .back-btn{
+    position:absolute;
+    left:12px;
+    top:12px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    height:40px;
+    min-width:40px;
+    padding:8px 10px;
+    gap:8px;
+    border-radius:10px;
+    border:none;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06));
+    color: #cfeee9;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    z-index:3;
+  }
+  .back-btn:active{ transform: translateY(1px); }
+  .grid{width:100%;max-width:1100px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px;padding-top:12px}
+  @media (max-width:1100px){ .grid{grid-template-columns:repeat(4,1fr);} }
+  @media (max-width:860px){ .grid{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:560px){ .grid{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:380px){ .grid{grid-template-columns:repeat(1,1fr);} }
+  .tile{border-radius:12px;padding:14px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));border:1px solid rgba(255,255,255,0.03);cursor:pointer;font-weight:800}
+  .tile:active{transform:translateY(1px)}
+  .thumb{font-size:14px;color:var(--accent);text-align:center}
+  .meta{font-size:12px;color:rgba(223,246,239,0.6);margin-top:8px;text-align:center}
+  .hint{font-size:13px;color:rgba(223,246,239,0.6);text-align:center;margin-top:8px}
+/* Modal preview for a game (iframe) */
+.game-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.game-modal[aria-hidden="false"] { display: flex; }
+.game-modal .scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(2,6,8,0.75);
+  backdrop-filter: blur(4px);
+}
+.game-modal .card {
+  position: relative;
+  width: min(92vw, 900px);
+  height: min(78vh, 600px);
+  background: linear-gradient(180deg, rgba(12,14,16,0.98), rgba(8,10,12,0.98));
+  border-radius: 12px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.6);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.03);
+  z-index: 2;
+  display:flex;
+  flex-direction:column;
+}
+.game-modal .card .top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.02);
+}
+.game-modal .card .title { font-weight:800; color:var(--accent); font-size:18px; }
+.game-modal .card .close {
+  background:transparent; border:none; color:#cfeee9; font-size:20px; line-height:1; padding:6px 8px; border-radius:8px; cursor:pointer;
+}
+.game-modal .card iframe {
+  flex:1;
+  border:0;
+  width:100%;
+  height:100%;
+  background:transparent;
+}
+</style>
+</head>
+<body class="games">
+
+  <canvas id="bg"></canvas>
+
+  <div class="wrap" role="main" aria-label="Mods">
+    <div class="header">
+      <button id="back-to-main" class="back-btn" aria-label="Back to main" title="Back to main">&larr; Back</button>
+      <div class="title" id="page-title" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">Mods
+        <div id="title-chooser" class="title-chooser" aria-hidden="true" role="menu" style="display:none; position:absolute; top:54px; left:50%; transform:translateX(-50%); background:linear-gradient(180deg, rgba(12,14,16,0.98), rgba(8,10,12,0.98)); padding:8px; border-radius:10px; box-shadow:0 12px 40px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.03); z-index:5;">
+          <button type="button" class="chooser-item" data-target="games" style="display:block; width:160px; padding:8px 10px; border-radius:8px; background:transparent; color:var(--accent); border:none; text-align:left; font-weight:800;">Games</button>
+          <button type="button" class="chooser-item" data-target="mods" style="display:block; width:160px; padding:8px 10px; border-radius:8px; margin-top:6px; background:transparent; color:rgba(223,246,239,0.9); border:none; text-align:left; font-weight:700;">Mods</button>
+        </div>
+      </div>
+      <div class="controls">
+        <input id="search" class="search" type="search" placeholder="Filter mods" aria-label="Filter mods" />
+      </div>
+    </div>
+
+    <div id="grid" class="grid" role="list" aria-live="polite"></div>
+
+    <div id="hint" class="hint">This mods page mirrors the games listing but contains only selected mod entries.</div>
+  </div>
+
+<script>
+(function(){
+  const grid = document.getElementById('grid');
+  const search = document.getElementById('search');
+
+  // Mods listing: Drive Mad 200 Levels entry (Bloodmoney removed) + one game dragged from Games
+  const mods = {
+    drive200_mod: { title: 'Drive Mad 200 Levels (mod)', desc: 'Drive Mad 200 Levels — extended driving mayhem', key: 'drive200_mod', url: 'https://griffylock.neocities.org/drive200' },
+    // added: single game from Games page as a mods entry (marked as mod)
+    mobilbluegon: { title: 'Mobil Bluegon (mod)', desc: 'Mobil Bluegon — mobile action', key: 'mobilbluegon', url: 'https://mrvaporwave25.github.io/Fog/v1/games/mobilblugon' },
+    // replaced: Burrito Bison -> Drive Mad S (mod)
+    drivemads: { title: 'Drive Mad S (mod)', desc: 'Drive Mad S — Drive Mad variant', key: 'drivemads', url: 'https://mrvaporwave25.github.io/Fog/v1/games/DriveS' },
+    // new: Overdrive mod
+    overdrive: { title: 'Overdrive (mod)', desc: 'Overdrive — high-speed action mod', key: 'overdrive', url: 'https://mrvaporwave25.github.io/Fog/v1/games/Overdrive' },
+    // new: Faraway mod
+    faraway: { title: 'Faraway (mod)', desc: 'Faraway — distant exploration mod', key: 'faraway', url: 'https://mrvaporwave25.github.io/Fog/v1/games/Faraway' },
+    // new: Drive Fun mod (added per request)
+    drivefun: { title: 'Drive Fun (mod)', desc: 'Drive Fun — playful driving mod', key: 'drivefun', url: 'https://griffylock.neocities.org/Drivefun' },
+    // new: Drive Fun 2 mod (added per request)
+    drivefun2: { title: 'Drive Fun 2 (mod)', desc: 'Drive Fun 2 — sequel/mod continuation', key: 'drivefun2', url: 'https://griffylock.neocities.org/Drivefun2' },
+    // added: Sky Drive mod
+    skydrive: { title: 'Sky Drive (mod)', desc: 'Sky Drive — aerial driving mod', key: 'skydrive', url: 'https://griffylock.neocities.org/SkyDrive' },
+    // added: Drive Together mod (new)
+    drivetogether: { title: 'Drive Together (mod)', desc: 'Drive Together — cooperative driving mod', key: 'drivetogether', url: 'https://griffylock.neocities.org/DriveTogether' },
+    // added: Cloud Drive mod
+    clouddrive: { title: 'Cloud Drive (mod)', desc: 'Cloud Drive — cloud-based driving mod', key: 'clouddrive', url: 'https://griffylock.neocities.org/CloudDrive' },
+    // new: Think Drive mod (added per request)
+    thinkdrive: { title: 'Think Drive (mod)', desc: 'Think Drive — thoughtful driving mod', key: 'thinkdrive', url: 'https://griffylock.neocities.org/ThinkDrive' },
+    // new: Drive Speed mod (added per user request)
+    drivespeed: { title: 'Drive Speed (mod)', desc: 'Drive Speed — fast-paced driving mod', key: 'drivespeed', url: 'https://griffylock.neocities.org/DriveSpeed' },
+    // new: Drive Monster mod (added per request)
+    drivemonster: { title: 'Drive Monster (mod)', desc: 'Drive Monster — monstrous driving mod', key: 'drivemonster', url: 'https://griffylock.neocities.org/DriveMonster' },
+    // new: Flippy-Feilds mod (added per request)
+    flippyfields: { title: 'Flippy-Feilds (mod)', desc: 'Flippy-Feilds — flip-and-drive mod', key: 'flippyfields', url: 'https://griffylock.neocities.org/Flippy-Fields' },
+    // added: Extreme Delivery mod (user request)
+    extremedelivery: { title: 'Extreme Delivery (mod)', desc: 'Extreme Delivery — high-intensity delivery mod', key: 'extremedelivery', url: 'https://griffylock.neocities.org/Extreme-Delivery' },
+    // added: Truck Driving mod (per request)
+    truckdriving: { title: 'Truck Driving (mod)', desc: 'Truck Driving — heavy vehicle driving mod', key: 'truckdriving', url: 'https://griffylock.neocities.org/TruckDriving' },
+    // added: Transporter mod (per user request)
+    transporter: { title: 'Transporter (mod)', desc: 'Transporter — cargo & delivery driving mod', key: 'transporter', url: 'https://griffylock.neocities.org/Transporter' },
+    // new: Drive N Jive mod (added by user)
+    drivenjive: { title: 'Drive N Jive (mod)', desc: 'Drive N Jive — rhythmic driving mod', key: 'drivenjive', url: 'https://griffylock.neocities.org/DriveNJive' },
+    // new: Drive N Jive 2 mod (added per user request)
+    drivenjive2: { title: 'Drive N Jive 2 (mod)', desc: 'Drive N Jive 2 — sequel rhythmic driving mod', key: 'drivenjive2', url: 'https://griffylock.neocities.org/DriveNJive2' },
+    // new: RustbucketRumble mod (added)
+    rustbucketrumble: { title: 'RustbucketRumble (mod)', desc: 'RustbucketRumble — chaotic rusty-vehicle brawls', key: 'rustbucketrumble', url: 'https://griffylock.neocities.org/RustbucketRumble' }
+  };
+
+  function renderGrid(filter=''){
+    const q = (filter||'').trim().toLowerCase();
+    grid.innerHTML = '';
+    const keys = Object.keys(mods);
+    const visible = keys.filter(k=>{
+      const g = mods[k];
+      return !q || g.title.toLowerCase().includes(q) || (g.desc && g.desc.toLowerCase().includes(q));
+    });
+    if(visible.length===0){
+      const nr = document.createElement('div');
+      nr.className='tile';
+      nr.style.gridColumn='1/-1';
+      nr.textContent='No mods found.';
+      grid.appendChild(nr);
+      return;
+    }
+    visible.forEach(k=>{
+      const g = mods[k];
+      const item = document.createElement('div');
+      item.className='tile';
+      item.tabIndex=0;
+      item.dataset.key = k;
+      const thumb = document.createElement('div'); thumb.className='thumb'; thumb.textContent = g.title;
+      const meta = document.createElement('div'); meta.className='meta'; meta.textContent = g.desc;
+      item.appendChild(thumb); item.appendChild(meta);
+      // prevent default navigation/scroll behavior and ensure the click opens the modal preview
+      item.addEventListener('click', (e)=> { e.preventDefault(); e.stopPropagation(); showPreview(g); }, { passive: false });
+      item.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); showPreview(g); } });
+      grid.appendChild(item);
+    });
+  }
+
+  function showPreview(g){
+    // guard: ensure page doesn't auto-scroll when opening preview
+    try { window.scrollTo(0,0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } catch(e){}
+    // Always open the local Games-style modal preview (do not postMessage the parent).
+    // This mirrors the Games page modal so Mods previews behave identically and load the mod URL in a contained iframe.
+    let modal = document.getElementById('game-modal');
+    if(!modal){
+      modal = document.createElement('div');
+      modal.id = 'game-modal';
+      modal.className = 'game-modal';
+      modal.setAttribute('aria-hidden','true');
+
+      modal.innerHTML = `
+        <div class="scrim" data-close="true" tabindex="-1"></div>
+        <div class="card" role="dialog" aria-label="Mod preview">
+          <div class="top">
+            <div class="title"></div>
+            <button class="close" aria-label="Close preview">&times;</button>
+          </div>
+          <iframe sandbox="allow-scripts allow-same-origin" scrolling="no" title="Mod preview"></iframe>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      // close handlers (scrim, X, Escape)
+      // Use non-passive listeners and stopPropagation so the document-level delegated
+      // "mods" click handler does not receive the click and accidentally re-open the chooser.
+      modal.querySelectorAll('[data-close], .close').forEach(el=>{
+        el.addEventListener('click', (ev) => {
+          try { ev.stopPropagation(); } catch(e){}
+          closeModal();
+        }, { passive: false });
+      });
+
+      window.addEventListener('keydown', (e)=>{
+        if(e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') closeModal();
+      }, {passive:true});
+    }
+
+    const titleEl = modal.querySelector('.title');
+    const cardEl = modal.querySelector('.card');
+    const iframe = modal.querySelector('iframe');
+    // enforce sandbox attributes on the iframe preview (ensure safe, same-origin sandboxing)
+    try { iframe.setAttribute('sandbox','allow-scripts allow-same-origin'); } catch(e){}
+
+    // Use games preview sizing (responsive modal)
+    cardEl.style.width = 'min(92vw, 900px)';
+    cardEl.style.height = 'min(78vh, 600px)';
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+
+    // Load the provided mod URL directly into the sandboxed preview iframe
+    if (g.url && g.url.trim()) {
+      try {
+        if (iframe._blobUrl) {
+          URL.revokeObjectURL(iframe._blobUrl);
+          iframe._blobUrl = null;
+        }
+      } catch (e){}
+      iframe.src = g.url;
+    } else {
+      // fallback to an embedded placeholder blob when no URL is present
+      const previewHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>${escapeHtml(g.title)}</title>
+        <style>
+          html,body{height:100%;margin:0;background:linear-gradient(180deg, rgba(8,12,16,1) 0%, rgba(10,14,18,0.9) 50%, rgba(2,6,8,1) 100%);color:#9feee0;font-family:system-ui, -apple-system;display:flex;align-items:center;justify-content:center}
+          .box{padding:18px;text-align:center}
+          h2{margin:0 0 6px;font-size:20px}
+          p{margin:0;opacity:.9}
+        </style>
+        </head><body><div class="box"><h2>${escapeHtml(g.title)}</h2><p>${escapeHtml(g.desc)}</p><div style="margin-top:12px;opacity:.75;font-size:13px">This is an embedded preview.</div></div></body></html>`;
+
+      if(iframe._blobUrl){
+        URL.revokeObjectURL(iframe._blobUrl);
+        iframe._blobUrl = null;
+      }
+      const blob = new Blob([previewHtml], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+      iframe._blobUrl = blobUrl;
+      iframe.src = blobUrl;
+    }
+
+    // show modal
+    titleEl.textContent = g.title || 'Preview';
+    modal.setAttribute('aria-hidden','false');
+
+    function closeModal(){
+      // briefly suppress delegated "mods" click handling so the act of closing a modal
+      // doesn't immediately trigger the global delegated handler that opens the chooser.
+      try { window.__suppressModsChooser = true; } catch(e){}
+      setTimeout(()=>{ try { window.__suppressModsChooser = false; } catch(e){} }, 250);
+
+      modal.setAttribute('aria-hidden','true');
+      try {
+        if(iframe._blobUrl) {
+          iframe.src = 'about:blank';
+          URL.revokeObjectURL(iframe._blobUrl);
+          iframe._blobUrl = null;
+        } else {
+          try { iframe.src = 'about:blank'; } catch(e){}
+        }
+      } catch(e){}
+      try { cardEl.style.width=''; cardEl.style.height=''; } catch(e){}
+    }
+
+    // focus the close button for keyboard users
+    const closeBtn = modal.querySelector('.close');
+    if(closeBtn) closeBtn.focus();
+  }
+
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  // live filtering
+  let last = '';
+  search.addEventListener('input', (e)=>{
+    const v = e.target.value || '';
+    if(v===last) return;
+    last = v;
+    renderGrid(v);
+  });
+
+  renderGrid();
+
+  // allow programmatic additions
+  window.__addMod = function(key,data){
+    if(!key||!data) return;
+    mods[key]=Object.assign({title:key,desc:''},data);
+    renderGrid(search.value);
+  };
+})();
+</script>
+
+<script>
+  // reuse the chooser/menu logic from the games page; ensure clicks on any visible "mods" text (or .mods-toggle) open the chooser reliably
+  (function(){
+    const title = document.getElementById('page-title');
+    const chooser = document.getElementById('title-chooser');
+    if (!title || !chooser) return;
+
+    function updateChooserPointer() {
+      const hidden = chooser.getAttribute('aria-hidden') === 'true' || chooser.style.display === 'none';
+      chooser.style.pointerEvents = hidden ? 'none' : 'auto';
+    }
+    updateChooserPointer();
+
+    function showChooser() {
+      chooser.setAttribute('aria-hidden','false');
+      chooser.style.display = 'block';
+      title.setAttribute('aria-expanded', 'true');
+      chooser.style.pointerEvents = 'auto';
+      const first = chooser.querySelector('.chooser-item');
+      if (first) first.focus();
+    }
+    function hideChooser() {
+      chooser.setAttribute('aria-hidden','true');
+      chooser.style.display = 'none';
+      title.setAttribute('aria-expanded', 'false');
+      chooser.style.pointerEvents = 'none';
+    }
+    function toggleChooser(ev) {
+      ev && ev.preventDefault && ev.preventDefault();
+      const hidden = chooser.getAttribute('aria-hidden') === 'true' || chooser.style.display === 'none';
+      if (hidden) showChooser(); else hideChooser();
+    }
+
+    // Title toggle (keyboard + click)
+    title.addEventListener('click', toggleChooser, { passive: true });
+    title.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') toggleChooser(e); }, { passive: true });
+
+    // chooser item behavior (games/mods)
+    chooser.querySelectorAll('.chooser-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const target = btn.dataset.target;
+        hideChooser();
+        if (target === 'mods') {
+          // navigate to the dedicated Mods page (reloads the mods view)
+          try { window.location.href = './mods.html'; }
+          catch (err) { try { location.replace('./mods.html'); } catch(e) { console.warn('Could not navigate to mods', e); } }
+          return;
+        }
+        if (target === 'games') {
+          // navigate to sibling games page in same folder (use explicit relative path)
+          try { window.location.href = './game.html'; }
+          catch (err) { try { location.replace('./game.html'); } catch(e) { console.warn('Could not navigate to games', e); } }
+        }
+      }, { passive: true });
+    });
+
+    // close chooser when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!chooser.contains(e.target) && !title.contains(e.target)) hideChooser();
+    }, { passive: true });
+
+    // Robust delegated handler (reworked): anywhere on document click, if a visible element (or ancestor up to 8 levels)
+    // contains the token "mods" (case-insensitive) or has class 'mods-toggle', show the chooser reliably.
+    // But ignore clicks that originate inside game/mod tiles or preview modals so previews open normally and their close X won't trigger the chooser.
+    document.addEventListener('click', function delegatedModsClick(ev) {
+      try {
+        // If a recent modal-close just occurred, suppress the delegated chooser open to avoid accidental reopening.
+        if (window.__suppressModsChooser) { try { window.__suppressModsChooser = false; } catch(e){}; return; }
+
+        let el = ev.target;
+        if (!el) return;
+        // don't react when clicking inside the chooser or the title itself (these have their own handlers)
+        if (chooser.contains(el) || title.contains(el)) return;
+
+        // Ignore clicks inside any preview/modal so modal close button doesn't open the chooser
+        if (el.closest && (el.closest('.game-modal') || el.closest('#game-modal') || el.closest('.mod-game-modal') || el.closest('#mod-game-modal'))) return;
+
+        // if click is inside a tile (game/mod preview tile), ignore to allow tile handlers to run
+        if (el.closest && el.closest('.tile')) return;
+        const MAX_LEVELS = 8;
+        for (let i = 0; i < MAX_LEVELS && el; i++, el = el.parentElement) {
+          if (!el) break;
+          // skip invisible elements
+          const style = window.getComputedStyle(el);
+          if (style && (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0)) continue;
+          // explicit class toggle should open chooser
+          if (el.classList && el.classList.contains('mods-toggle')) { showChooser(); return; }
+          const txt = (el.textContent || '').trim();
+          if (!txt) continue;
+          // case-insensitive token match for 'mods' — will show chooser when user clicks any visible "mods" label/text
+          if (/\bmods\b/i.test(txt)) {
+            showChooser();
+            return;
+          }
+        }
+      } catch (e) {
+        // noop
+      }
+    }, false);
+  })();
+</script>
+
+<script>
+  // Back button: close fullscreen iframe or navigate back to index.html
+  (function(){
+    const btn = document.getElementById('back-to-main');
+    if(!btn) return;
+    btn.addEventListener('click', () => {
+      try {
+        if (window.parent && window.parent !== window) {
+          try { window.parent.postMessage({ type: 'close-preview', source: 'mods-page' }, '*'); } catch(e){}
+        }
+        const iframe = document.getElementById('__search_full_iframe');
+        if (iframe && iframe.parentNode) {
+          try { iframe.parentNode.removeChild(iframe); } catch (e) {}
+        }
+        try { window.location.href = 'index.html'; } catch (e) { if (window.history && window.history.length > 1) window.history.back(); }
+      } catch (e) {
+        try { if (window.history && window.history.length > 1) window.history.back(); else window.location.href = '/index.html'; } catch(e){}
+      }
+    }, { passive: true });
+  })();
+</script>
+
+<script>
+  // Also allow clicking the visible "Mods" label/text to reopen the chooser menu when present,
+  // mirroring the Games page behavior (delegated handler that shows chooser when a visible "mods" label is clicked).
+  (function(){
+    try {
+      const title = document.getElementById('page-title');
+      const chooser = document.getElementById('title-chooser');
+      if (!title || !chooser) return;
+
+      // Helper to show chooser (idempotent)
+      function showChooser() {
+        const hidden = chooser.getAttribute('aria-hidden') === 'true' || chooser.style.display === 'none';
+        if (!hidden) return;
+        chooser.setAttribute('aria-hidden','false');
+        chooser.style.display = 'block';
+        title.setAttribute('aria-expanded','true');
+        chooser.style.pointerEvents = 'auto';
+        const first = chooser.querySelector('.chooser-item');
+        if (first) first.focus();
+      }
+
+      // Keep the original title toggle intact (works when title is clicked directly)
+      title.addEventListener('click', (e) => {
+        e && e.preventDefault();
+        const isHidden = chooser.getAttribute('aria-hidden') === 'true' || chooser.style.display === 'none';
+        if (isHidden) showChooser();
+        else {
+          chooser.setAttribute('aria-hidden','true');
+          chooser.style.display = 'none';
+          title.setAttribute('aria-expanded','false');
+          chooser.style.pointerEvents = 'none';
+        }
+      }, { passive: true });
+
+      // Delegated click handler: open chooser whenever a visible "mods" label/text is clicked anywhere
+      // Ignore clicks inside tiles so tile click handlers (previews) take priority.
+      document.addEventListener('click', (ev) => {
+        try {
+          // Suppress delegated handling briefly after modal-close to avoid immediate re-opening
+          if (window.__suppressModsChooser) { try { window.__suppressModsChooser = false; } catch(e){}; return; }
+
+          let el = ev.target;
+          if (!el) return;
+
+          // avoid reacting to clicks inside the chooser itself
+          if (chooser.contains(el)) return;
+
+          // if click is inside a tile (game/mod preview tile), ignore to allow tile handlers to run
+          if (el.closest && el.closest('.tile')) return;
+
+          // look up the tree for up to 6 ancestors to find elements containing "mods"
+          const MAX_LEVELS = 6;
+          for (let i = 0; i < MAX_LEVELS && el; i++, el = el.parentElement) {
+            if (!el) break;
+            const style = window.getComputedStyle(el);
+            if (style && (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0)) continue;
+            const txt = (el.textContent || '').trim();
+            if (!txt) continue;
+            if (txt.toLowerCase().includes('mods')) {
+              // Show chooser and stop propagation so only the chooser opens
+              showChooser();
+              break;
+            }
+            // Also allow explicit opt-in: elements marked with .mods-toggle open the chooser immediately
+            if (el.classList && el.classList.contains('mods-toggle')) {
+              showChooser();
+              break;
+            }
+          }
+        } catch (e) { /* ignore */ }
+      }, { passive: true });
+    } catch (e) {}
+  })();
+</script>
+
+<!-- include site background script so the shared animated canvas runs -->
+<script type="module" src="../main.js"></script>
+</body>
+</html>
